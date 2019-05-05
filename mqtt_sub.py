@@ -19,9 +19,11 @@ def mqtt_thread():
     while True:
         data_1 = q.get()
         try:
+            logging.debug("T:start time:"+str(datetime.now()))
             mydb = myclient[data_1[0]]
-            mydb.mqtt.insert_one(data_1[1])
+            mydb.tracking_details.insert_one(data_1[1])
             logging.debug("Inserted successfully:"+str(data_1))
+            logging.debug("T:end time:"+str(datetime.now()))
         except Exception as e:
             logging.debug(str(e))
 
@@ -42,11 +44,11 @@ def on_message(client, userdata, msg):
 
     logging.debug("end time:"+str(datetime.now()))
 
-
-client = mqtt.Client()
-client.on_connect = on_connect
-client.on_message = on_message
-client.connect(ip, 1883, 60)
-logging.debug("Connected to broker successfully")
-threading.Thread(target=mqtt_thread).start()
-client.loop_forever()
+if __name__=="__main__":
+    client = mqtt.Client()
+    client.on_connect = on_connect
+    client.on_message = on_message
+    client.connect(ip, 1883, 60)
+    logging.debug("Connected to broker successfully")
+    threading.Thread(target=mqtt_thread).start()
+    client.loop_forever()
