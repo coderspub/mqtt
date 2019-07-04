@@ -4,25 +4,41 @@ import logging
 import queue
 import threading
 from datetime import datetime
-
+import pymysql
 import paho.mqtt.client as mqtt
-from pymongo import MongoClient
 
-logging.basicConfig(level=logging.DEBUG, format='%(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(levelname)s - %(message)s')
 ip = "35.244.17.132"
 sub_topic = "fleet/#"
 q = queue.Queue(maxsize=0)
 
+def database(db1='fleet_admin'):
+    return pymysql.connect(host='localhost', user='fleet',password='Fleet@123', db=db1, cursorclass=pymysql.cursors.DictCursor)
 
 def mqtt_thread():
-    myclient = MongoClient("mongodb://localhost:27017/")
     while True:
         data_1 = q.get()
         try:
             logging.debug("T:start time:"+str(datetime.now()))
-            mydb = myclient[data_1[0]]
-            mydb.tracking_details.insert_one(data_1[1])
-            logging.debug("Inserted successfully:"+str(data_1))
+            dba = database()
+            with dba.cursor() as mycursor:
+                mycursor.execute("SELECT db FROM reg_user WHERE email_id=%s",[data_1[0]])
+                result = mycursor.fetchone()
+            dba.close()
+            if result!=None:
+                lon=data_1[1]['Longitude']
+                lat=data_1[1]['Latitude']
+                speed=data_1[1]['Speed']
+                accuracy=data_1[1]['Accuracy']
+                dt=str(datetime.now())
+                appid=data_1[1]['AppId']
+                dba = database(result['db'])
+                with dba.cursor() as mycursor:
+                    mycursor.execute("INSERT into app_tracking_details (location,speed,accuracy,datetime,appid) values (ST_GEOMFROMTEXT('POINT(%s %s)'),%s,%s,%s,%s)",(lon,lat,speed,accuracy,dt,appid))
+                dba.commit()
+                dba.close()
+                #mydb.tracking_details.insert_one(data_1[1])
+                logging.debug("Inserted successfully")
             logging.debug("T:end time:"+str(datetime.now()))
         except Exception as e:
             logging.debug(str(e))
